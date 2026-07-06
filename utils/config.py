@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+import joblib
 
 
 load_dotenv(override=True)
@@ -16,6 +17,6 @@ MODELS_FOLDER_PATH = os.path.join(BASE_DIR, "models")
 
 
 # Models
-preprocessor = os.path.join(MODELS_FOLDER_PATH, "preprocessor.pkl")
-forest_model = os.path.join(MODELS_FOLDER_PATH, "forest_tuned.pkl")
-xgboost_model = os.path.join(MODELS_FOLDER_PATH, "xgb-tuned.pkl")
+preprocessor = joblib.load(os.path.join(MODELS_FOLDER_PATH, "preprocessor.pkl"))
+forest_model = joblib.load(os.path.join(MODELS_FOLDER_PATH, "forest_tuned.pkl"))
+xgboost_model = joblib.load(os.path.join(MODELS_FOLDER_PATH, "xgb-tuned.pkl"))
