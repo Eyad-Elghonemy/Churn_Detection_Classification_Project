@@ -33,14 +33,14 @@ The project predicts whether a bank customer is likely to **churn** (leave the b
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────┐        HTTPS + X-API-Key         ┌───────────────────────┐
-│   Streamlit Cloud   │ ─────────────────────────────▶  │ Hugging Face Spaces    │
-│   streamlit_app.py  │◀─────────────────────────────── │  FastAPI (main.py)     │
-│   "Churn Ledger"    │        JSON prediction           │  + Docker             │
-└─────────────────────┘                                  └─────────────┬─────────┘
-                                                                       │
-                                                          ┌────────────▼───────────┐
+``` bash
+┌─────────────────────┐        HTTPS + X-API-Key           ┌───────────────────────┐
+│   Streamlit Cloud   │ ───────────────────────────────▶ │  Hugging Face Spaces  │
+│   streamlit_app.py  │◀───────────────────────────────  │  FastAPI (main.py)    │
+│   "Churn Ledger"    │        JSON prediction            │  + Docker             │
+└─────────────────────┘                                    └──────────┬────────────┘
+                                                                      │
+                                                          ┌───────────▼────────────┐
                                                           │  models/*.pkl          │
                                                           │  preprocessor,         │
                                                           │  forest_tuned,         │
@@ -48,11 +48,11 @@ The project predicts whether a bank customer is likely to **churn** (leave the b
                                                           └────────────────────────┘
 ```
 
----
+--- 
 
 ## 📁 Repository Structure
 
-```
+``` bash
 churn_live/
 ├── main.py                    # FastAPI app & routes
 ├── requirements.txt           # Backend dependencies
@@ -161,6 +161,50 @@ Interactive docs (Swagger UI) are available at `/docs` on the API base URL.
 
 ---
 
+## 🔐 Environment Variables
+
+The API reads its configuration from a `.env` file via `utils/config.py`. Copy the template and fill in your own values:
+
+```bash
+cp .env.example .env
+```
+
+**`.env.example`**
+```
+APP_NAME="Churn-Detection"
+VERSION="1.0"
+SECRET_KEY_TOKEN="your-secret-key-here"
+```
+
+| Variable | Used for |
+|---|---|
+| `APP_NAME` | App title shown in FastAPI docs and the `/` welcome message |
+| `VERSION` | API version shown in FastAPI docs and the `/` welcome message |
+| `SECRET_KEY_TOKEN` | The value every request must send in the `X-API-Key` header to hit `/predict/*` |
+
+`.env` is already listed in `.gitignore`, so it's never committed. When deploying to **Hugging Face Spaces**, don't upload a `.env` file at all — set these same three variables under **Settings → Variables and secrets** on the Space instead; the app reads them as normal environment variables either way.
+
+> Tip: double-check `.env.example` in your repo — as currently written it has a stray `==` on the `VERSION` line and no value after `SECRET_KEY_TOKEN =`. Fix it to match the block above so teammates can copy it directly.
+
+--- 
+
+## 🐳 Docker
+
+The `Dockerfile` builds the exact environment used in production on Hugging Face Spaces, so you can test it locally before pushing:
+
+```bash
+docker build -t churn-api .
+docker run --rm --env-file .env -p 8000:7860 churn-api
+```
+
+- The container listens on **port 7860** (required by Hugging Face Spaces) — the command above maps it to `8000` on your machine so it matches the "Running Locally" instructions below.
+- `--env-file .env` passes `APP_NAME`, `VERSION`, and `SECRET_KEY_TOKEN` into the container; make sure `.env` exists first (see above).
+- Once running, the API behaves identically to the hosted version: `http://localhost:8000/docs` for Swagger UI, `http://localhost:8000/predict/forest` etc.
+
+On Hugging Face Spaces, this same `Dockerfile` is picked up automatically on every push — no extra configuration needed beyond the repository secrets.
+
+---
+
 ## 🖥️ Running Locally
 
 ### 1. Backend (FastAPI)
@@ -172,6 +216,8 @@ cp .env.example .env   # fill in APP_NAME, VERSION, SECRET_KEY_TOKEN
 uvicorn main:app --reload
 ```
 API available at `http://localhost:8000` (docs at `/docs`).
+
+> Prefer containers? See the **🐳 Docker** section above for the exact same setup running in Docker.
 
 ### 2. Dashboard (Streamlit)
 ```bash
@@ -193,7 +239,7 @@ Open the sidebar and set:
 
 Environment variables (`APP_NAME`, `VERSION`, `SECRET_KEY_TOKEN`) are set as **repository secrets** on the Space — never committed to the repo.
 
----
+--- =
 
 ## 🧠 Model Performance
 
