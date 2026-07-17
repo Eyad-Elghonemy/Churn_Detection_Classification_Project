@@ -29,6 +29,11 @@ st.set_page_config(
 )
 
 # --------------------------------------------------------------------------
+# Backend connection (built-in, not user-editable)
+# --------------------------------------------------------------------------
+API_BASE_URL = "https://eyadzz-churn-live.hf.space/"
+
+# --------------------------------------------------------------------------
 # Design tokens & theme
 # --------------------------------------------------------------------------
 INK = "#10161C"
@@ -429,7 +434,8 @@ with st.sidebar:
     st.markdown('<hr class="rule">', unsafe_allow_html=True)
 
     st.markdown('<div class="eyebrow">Connection</div>', unsafe_allow_html=True)
-    base_url = st.text_input("API base URL", value="http://localhost:8000")
+    base_url = API_BASE_URL
+    st.caption(f"API base URL: `{base_url}`")
     api_key = st.text_input("X-API-Key", type="password", value="")
 
     ok, msg = api_health(base_url)
