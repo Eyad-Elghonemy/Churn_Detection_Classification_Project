@@ -366,6 +366,22 @@ def call_predict(base_url: str, api_key: str, model: str, payload: dict, timeout
         return False, str(e)
 
 
+def get_usage_stats(base_url: str, api_key: str, timeout=8):
+    url = base_url.rstrip("/") + "/stats"
+    headers = {"X-API-Key": api_key}
+    try:
+        r = requests.get(url, headers=headers, timeout=timeout)
+        if r.status_code == 200:
+            return True, r.json()
+        try:
+            detail = r.json().get("detail", r.text)
+        except Exception:
+            detail = r.text
+        return False, f"HTTP {r.status_code}: {detail}"
+    except requests.exceptions.RequestException as e:
+        return False, str(e)
+
+
 def risk_band(prob: float):
     if prob < 0.33:
         return "low", "badge-low", TEAL
@@ -452,6 +468,7 @@ with st.sidebar:
         ("🧾", "Score a Customer"),
         ("📥", "Batch Scoring"),
         ("📚", "Model Insights"),
+        ("📈", "Usage Analytics"),
     ]
     if "nav_page" not in st.session_state:
         st.session_state.nav_page = NAV_ITEMS[0][1]
@@ -848,7 +865,75 @@ elif page == "Model Insights":
         )
 
 # --------------------------------------------------------------------------
-# Footer
+# PAGE: Usage Analytics
+# --------------------------------------------------------------------------
+elif page == "Usage Analytics":
+    st.markdown('<div class="eyebrow">Who\'s Using the Models</div>', unsafe_allow_html=True)
+    st.caption("Live counts pulled from the API's own request log — every successful /predict call anywhere (this dashboard or direct API calls) is counted.")
+
+    if not api_key:
+        st.warning("Enter your X-API-Key in the sidebar to load usage stats.")
+    else:
+        success, stats = get_usage_stats(base_url, api_key)
+        if not success:
+            st.error(f"Could not load usage stats: {stats}")
+        else:
+            forest_count = stats.get("forest", {}).get("count", 0)
+            xgb_count = stats.get("xgboost", {}).get("count", 0)
+            total = forest_count + xgb_count
+
+            c1, c2, c3 = st.columns(3)
+            kpi_card_v2("🌲", "Random Forest calls", f"{forest_count:,}", TEAL, c1)
+            kpi_card_v2("⚡", "XGBoost calls", f"{xgb_count:,}", BRASS, c2)
+            kpi_card_v2("Σ", "Total predictions served", f"{total:,}", "#6E8CA0", c3)
+
+            st.write("")
+            left, right = st.columns([1, 1.3], gap="large")
+
+            with left:
+                st.markdown("**Calls by model**")
+                fig = go.Figure(
+                    go.Bar(
+                        x=["Random Forest", "XGBoost"], y=[forest_count, xgb_count],
+                        marker=dict(color=[TEAL, BRASS], cornerradius=8),
+                        text=[forest_count, xgb_count], textposition="outside",
+                        textfont=dict(family="IBM Plex Mono", size=13),
+                    )
+                )
+                fig.update_layout(template=PLOTLY_TEMPLATE, height=320, yaxis_title="Predictions served")
+                st.plotly_chart(fig, use_container_width=True)
+
+            with right:
+                st.markdown("**Requests over time**")
+                all_ts = []
+                for model_name, color in [("forest", TEAL), ("xgboost", BRASS)]:
+                    for ts in stats.get(model_name, {}).get("timestamps", []):
+                        all_ts.append({"timestamp": ts, "model": model_name})
+                if not all_ts:
+                    st.info("No requests logged yet — once the API gets some traffic, this chart fills in.")
+                else:
+                    ts_df = pd.DataFrame(all_ts)
+                    ts_df["timestamp"] = pd.to_datetime(ts_df["timestamp"])
+                    ts_df["date"] = ts_df["timestamp"].dt.date
+                    daily = ts_df.groupby(["date", "model"]).size().reset_index(name="calls")
+                    fig = go.Figure()
+                    for model_name, color in [("forest", TEAL), ("xgboost", BRASS)]:
+                        sub = daily[daily["model"] == model_name]
+                        fig.add_trace(
+                            go.Bar(x=sub["date"], y=sub["calls"], name=model_name.title(), marker_color=color)
+                        )
+                    fig.update_layout(
+                        template=PLOTLY_TEMPLATE, height=320, barmode="stack",
+                        yaxis_title="Predictions", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+            st.caption(
+                "This log lives in a JSON file on the API's own filesystem — it persists while the service is "
+                "running or asleep, and resets on the next deployment."
+            )
+
+
 # --------------------------------------------------------------------------
 st.markdown('<hr class="rule">', unsafe_allow_html=True)
 st.caption("Churn Ledger · a Streamlit front-end for the Churn-Detection FastAPI service · predictions are never computed locally.")

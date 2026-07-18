@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils.inference import predict_new
 from utils.config import APP_NAME, VERSION, SECRET_KEY_TOKEN, preprocessor, forest_model, xgboost_model
 from utils.CustomerData import CustomerData
+from utils.usage_tracker import log_usage, get_stats
 
 app = FastAPI(title=APP_NAME, version=VERSION)
 app.add_middleware(
@@ -29,6 +30,12 @@ async def home():
     return {
             "Message": f"Welcome To My {APP_NAME} API v{VERSION}"
     }
+
+
+
+@app.get('/stats', tags=['General'])
+async def stats(api_key: str = Depends(verify_api_key)) -> dict:
+        return get_stats()
     
     
 
@@ -37,6 +44,7 @@ async def predict_forest(data: CustomerData, api_key: str=Depends(verify_api_key
         
         try:
                 result = predict_new(data=data, preprocessor=preprocessor, model=forest_model)
+                log_usage("forest")
                 return result
         except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
@@ -48,6 +56,7 @@ async def predict_xgboost(data: CustomerData, api_key: str=Depends(verify_api_ke
         
         try:
                 result = predict_new(data=data, preprocessor=preprocessor, model=xgboost_model)
+                log_usage("xgboost")
                 return result
         
         except Exception as e:
