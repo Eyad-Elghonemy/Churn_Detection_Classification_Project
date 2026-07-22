@@ -9,6 +9,8 @@ The app never loads models directly — every prediction is a real HTTP call to
 your FastAPI instance, so it reflects exactly what the API returns.
 """
 
+import hashlib
+import json
 import time
 from datetime import datetime
 
@@ -22,8 +24,8 @@ import streamlit as st
 # Page config
 # --------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Churn Ledger",
-    page_icon="📖",
+    page_title="NOVA",
+    page_icon="📉",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -273,6 +275,79 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primar
     width: 3.4rem;
     text-align: right;
 }}
+
+/* --- NOVA logo: rotating orbital ring around the N --- */
+.nova-logo-row {{
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.1rem;
+}}
+.nova-logo-wrap {{
+    position: relative;
+    width: 46px;
+    height: 46px;
+    flex: none;
+}}
+.nova-ring {{
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, {TEAL}, {BRASS}, {TEAL});
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+    animation: nova-spin 5s linear infinite;
+    filter: drop-shadow(0 0 5px rgba(201,162,39,0.5));
+}}
+.nova-ring::after {{
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    border-radius: 50%;
+    background: {TEAL};
+    box-shadow: 0 0 8px 2px {TEAL};
+}}
+@keyframes nova-spin {{
+    from {{ transform: rotate(0deg); }}
+    to   {{ transform: rotate(360deg); }}
+}}
+.nova-letter {{
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: {PANEL};
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    background-image: linear-gradient(135deg, {TEAL}, {BRASS});
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}}
+.nova-wordmark {{
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 1.7rem;
+    letter-spacing: 0.06em;
+    background-image: linear-gradient(100deg, {TEAL} 0%, {BRASS} 65%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}}
+.nova-wordmark-sub {{
+    color: {MUTED};
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-top: -0.2rem;
+}}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -426,6 +501,28 @@ def kpi_card(label, value, col):
     )
 
 
+def nova_logo(sub_label="Churn Detection Service"):
+    st.markdown(
+        f"""<div class="nova-logo-row">
+                <div class="nova-logo-wrap">
+                    <div class="nova-ring"></div>
+                    <div class="nova-letter">N</div>
+                </div>
+                <div>
+                    <div class="nova-wordmark">NOVA</div>
+                    <div class="nova-wordmark-sub">{sub_label}</div>
+                </div>
+            </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def fingerprint(model: str, payload: dict) -> str:
+    """Stable hash of a model + payload combo, used to detect repeat requests."""
+    canonical = json.dumps({"model": model, "payload": payload}, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def kpi_card_v2(icon, label, value, accent, col):
     col.markdown(
         f"""<div class="kpi-card-v2">
@@ -442,11 +539,7 @@ def kpi_card_v2(icon, label, value, accent, col):
 # Sidebar — connection & navigation
 # --------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown(
-        '<div class="eyebrow">Churn Detection Service</div>'
-        '<div class="ledger-title" style="font-size:1.5rem;">📖 Churn Ledger</div>',
-        unsafe_allow_html=True,
-    )
+    nova_logo()
     st.markdown('<hr class="rule">', unsafe_allow_html=True)
 
     st.markdown('<div class="eyebrow">Connection</div>', unsafe_allow_html=True)
@@ -478,7 +571,7 @@ with st.sidebar:
         if st.button(
             f"{icon}   {label}",
             key=f"nav_{label}",
-            use_container_width=True,
+            width="stretch",
             type="primary" if is_active else "secondary",
         ):
             st.session_state.nav_page = label
@@ -488,16 +581,16 @@ with st.sidebar:
 
     st.markdown('<hr class="rule">', unsafe_allow_html=True)
     st.caption(f"Session predictions logged: {len(st.session_state.history)}")
-    if st.session_state.history and st.button("🗑️   Clear session history", use_container_width=True):
+    if st.session_state.history and st.button("🗑️   Clear session history", width="stretch"):
         st.session_state.history = []
         st.rerun()
 
 # --------------------------------------------------------------------------
 # Header
 # --------------------------------------------------------------------------
+st.markdown('<div class="eyebrow">Bank Customer Churn</div>', unsafe_allow_html=True)
+nova_logo(sub_label="")
 st.markdown(
-    '<div class="eyebrow">Bank Customer Churn</div>'
-    '<div class="ledger-title">Churn Ledger</div>'
     '<div class="ledger-subtitle">A live dashboard on top of your FastAPI churn-prediction service — '
     'portfolio trends, single-customer scoring, batch scoring, and a record of the modeling work behind it.</div>'
     '<hr class="rule">',
@@ -543,7 +636,7 @@ if page == "Portfolio Overview":
             xaxis=dict(visible=False, range=[0, max(geo_vals) * 1.28]),
             margin=dict(l=10, r=30, t=10, b=10),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with right:
         st.markdown("**Retained vs. churned**")
@@ -566,7 +659,7 @@ if page == "Portfolio Overview":
             template=PLOTLY_TEMPLATE, height=300, showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.write("")
     st.markdown("**Customer mix by gender**")
@@ -585,7 +678,7 @@ if page == "Portfolio Overview":
     )
     fig.update_layout(template=PLOTLY_TEMPLATE, height=300)
     fig.update_annotations(font=dict(family="Inter", size=13, color=MUTED))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     if st.session_state.history:
         st.markdown('<hr class="rule">', unsafe_allow_html=True)
@@ -602,7 +695,7 @@ if page == "Portfolio Overview":
         fig.update_layout(
             template=PLOTLY_TEMPLATE, height=280, xaxis_title="Predicted churn probability (%)", yaxis_title="Customers scored"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 # --------------------------------------------------------------------------
 # PAGE: Score a Customer
@@ -630,7 +723,7 @@ elif page == "Score a Customer":
                 is_active = st.selectbox("Active member", ["Yes", "No"], help=CUSTOMER_FIELDS_HELP["IsActiveMember"])
                 salary = st.number_input("Estimated salary", min_value=0.0, value=100000.0, step=1000.0, help=CUSTOMER_FIELDS_HELP["EstimatedSalary"])
 
-            submitted = st.form_submit_button("Score this customer", use_container_width=True)
+            submitted = st.form_submit_button("Score this customer", width="stretch")
 
     if submitted:
         payload = {
@@ -645,8 +738,19 @@ elif page == "Score a Customer":
             "IsActiveMember": 1 if is_active == "Yes" else 0,
             "EstimatedSalary": float(salary),
         }
-        with st.spinner("Calling the API..."):
-            success, result = call_predict(base_url, api_key, model_choice, payload)
+
+        req_fp = fingerprint(model_choice, payload)
+        is_duplicate = st.session_state.get("last_predict_fp") == req_fp
+
+        if is_duplicate:
+            st.info("⚠️ Same customer and model as your last request — reusing the previous result instead of calling the API again.")
+            success, result = True, st.session_state["last_predict_result"]
+        else:
+            with st.spinner("Calling the API..."):
+                success, result = call_predict(base_url, api_key, model_choice, payload)
+            if success:
+                st.session_state["last_predict_fp"] = req_fp
+                st.session_state["last_predict_result"] = result
 
         with result_col:
             if not success:
@@ -656,7 +760,7 @@ elif page == "Score a Customer":
                 pred = result["Churn_Prediction"]
                 band, badge_class, _ = risk_band(prob)
 
-                st.plotly_chart(gauge_chart(prob), use_container_width=True)
+                st.plotly_chart(gauge_chart(prob), width="stretch")
                 st.markdown(
                     f'<span class="badge {badge_class}">{band.upper()} RISK</span>&nbsp;&nbsp;'
                     f'<span style="color:{MUTED};">Predicted label: '
@@ -669,17 +773,18 @@ elif page == "Score a Customer":
                 fig = go.Figure(go.Bar(x=list(top_feats.values()), y=list(top_feats.keys()), orientation="h", marker_color=BRASS))
                 fig.update_layout(template=PLOTLY_TEMPLATE, height=260, xaxis_title="Relative importance (Random Forest)")
                 fig.update_yaxes(autorange="reversed")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
-                st.session_state.history.append(
-                    {
-                        "timestamp": datetime.now().strftime("%H:%M:%S"),
-                        "model": model_choice,
-                        "probability": prob,
-                        "prediction": "Churn" if pred else "Stay",
-                        **payload,
-                    }
-                )
+                if not is_duplicate:
+                    st.session_state.history.append(
+                        {
+                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "model": model_choice,
+                            "probability": prob,
+                            "prediction": "Churn" if pred else "Stay",
+                            **payload,
+                        }
+                    )
 
     if st.session_state.history:
         st.markdown('<hr class="rule">', unsafe_allow_html=True)
@@ -687,7 +792,7 @@ elif page == "Score a Customer":
         recent = pd.DataFrame(st.session_state.history[::-1][:10])
         recent_display = recent[["timestamp", "model", "prediction", "probability"]].copy()
         recent_display["probability"] = recent_display["probability"].apply(lambda p: f"{p:.1%}")
-        st.dataframe(recent_display, use_container_width=True, hide_index=True)
+        st.dataframe(recent_display, width="stretch", hide_index=True)
 
 # --------------------------------------------------------------------------
 # PAGE: Batch Scoring
@@ -715,27 +820,37 @@ elif page == "Batch Scoring":
             if missing:
                 st.error(f"Missing required columns: {', '.join(missing)}")
             else:
-                st.dataframe(df.head(), use_container_width=True)
-                if st.button(f"Score {len(df)} customers", use_container_width=True):
-                    results = []
-                    progress = st.progress(0.0, text="Scoring...")
-                    for i, row in df.iterrows():
-                        payload = {k: row[k] for k in CUSTOMER_FIELDS_HELP}
-                        # Coerce numeric types the API expects
-                        for k in ["CreditScore", "Age", "Tenure", "NumOfProducts", "HasCrCard", "IsActiveMember"]:
-                            payload[k] = int(payload[k])
-                        for k in ["Balance", "EstimatedSalary"]:
-                            payload[k] = float(payload[k])
+                st.dataframe(df.head(), width="stretch")
+                if st.button(f"Score {len(df)} customers", width="stretch"):
+                    batch_fp = fingerprint(model_choice_b, {"csv_hash": hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values.tobytes()).hexdigest()})
+                    is_duplicate_batch = st.session_state.get("last_batch_fp") == batch_fp
 
-                        success, result = call_predict(base_url, api_key, model_choice_b, payload)
-                        if success:
-                            results.append({**payload, "Churn_Prediction": result["Churn_Prediction"], "Churn_Probability": result["Churn_Probability"]})
-                        else:
-                            results.append({**payload, "Churn_Prediction": None, "Churn_Probability": None, "error": result})
-                        progress.progress((i + 1) / len(df), text=f"Scoring... {i+1}/{len(df)}")
-                    progress.empty()
+                    if is_duplicate_batch:
+                        st.info("⚠️ This is the same file and model as your last batch — reusing the previous results instead of calling the API again.")
+                        res_df = st.session_state["last_batch_result"]
+                    else:
+                        results = []
+                        progress = st.progress(0.0, text="Scoring...")
+                        for i, row in df.iterrows():
+                            payload = {k: row[k] for k in CUSTOMER_FIELDS_HELP}
+                            # Coerce numeric types the API expects
+                            for k in ["CreditScore", "Age", "Tenure", "NumOfProducts", "HasCrCard", "IsActiveMember"]:
+                                payload[k] = int(payload[k])
+                            for k in ["Balance", "EstimatedSalary"]:
+                                payload[k] = float(payload[k])
 
-                    res_df = pd.DataFrame(results)
+                            success, result = call_predict(base_url, api_key, model_choice_b, payload)
+                            if success:
+                                results.append({**payload, "Churn_Prediction": result["Churn_Prediction"], "Churn_Probability": result["Churn_Probability"]})
+                            else:
+                                results.append({**payload, "Churn_Prediction": None, "Churn_Probability": None, "error": result})
+                            progress.progress((i + 1) / len(df), text=f"Scoring... {i+1}/{len(df)}")
+                        progress.empty()
+
+                        res_df = pd.DataFrame(results)
+                        st.session_state["last_batch_fp"] = batch_fp
+                        st.session_state["last_batch_result"] = res_df
+
                     st.success(f"Scored {len(res_df)} customers.")
 
                     c1, c2 = st.columns(2)
@@ -744,7 +859,7 @@ elif page == "Batch Scoring":
                         st.markdown("**Risk distribution**")
                         fig = go.Figure(go.Histogram(x=valid["Churn_Probability"] * 100, nbinsx=20, marker_color=TEAL))
                         fig.update_layout(template=PLOTLY_TEMPLATE, height=300, xaxis_title="Predicted churn probability (%)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
                     with c2:
                         st.markdown("**Predicted outcome split**")
                         counts = valid["Churn_Prediction"].value_counts()
@@ -757,16 +872,16 @@ elif page == "Batch Scoring":
                             )
                         )
                         fig.update_layout(template=PLOTLY_TEMPLATE, height=300, showlegend=True)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                     st.markdown("**Full results**")
-                    st.dataframe(res_df, use_container_width=True, hide_index=True)
+                    st.dataframe(res_df, width="stretch", hide_index=True)
                     st.download_button(
                         "Download scored CSV",
                         res_df.to_csv(index=False).encode("utf-8"),
                         file_name="churn_scores.csv",
                         mime="text/csv",
-                        use_container_width=True,
+                        width="stretch",
                     )
 
 # --------------------------------------------------------------------------
@@ -809,7 +924,7 @@ elif page == "Model Insights":
         xaxis=dict(tickmode="array", tickvals=list(ledger_df["step"]), ticktext=list(ledger_df["short"]), tickangle=-25),
         yaxis_title="F1 score", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     left, right = st.columns([1.1, 1], gap="large")
 
@@ -851,7 +966,7 @@ elif page == "Model Insights":
             )
         )
         fig.update_layout(template=PLOTLY_TEMPLATE, height=420, xaxis=dict(visible=False, range=[0, feat_df["Importance"].max() * 1.25]))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with st.container(border=True):
         st.markdown('<div class="eyebrow">Notes</div>', unsafe_allow_html=True)
@@ -869,7 +984,7 @@ elif page == "Model Insights":
 # --------------------------------------------------------------------------
 elif page == "Usage Analytics":
     st.markdown('<div class="eyebrow">Who\'s Using the Models</div>', unsafe_allow_html=True)
-    st.caption("Live counts pulled from the API's own request log — every successful /predict call anywhere (this dashboard or direct API calls) is counted.")
+    st.caption("Live counts pulled from Supabase — every successful /predict call anywhere (this dashboard or direct API calls) is logged and counted.")
 
     if not api_key:
         st.warning("Enter your X-API-Key in the sidebar to load usage stats.")
@@ -901,12 +1016,12 @@ elif page == "Usage Analytics":
                     )
                 )
                 fig.update_layout(template=PLOTLY_TEMPLATE, height=320, yaxis_title="Predictions served")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             with right:
                 st.markdown("**Requests over time**")
                 all_ts = []
-                for model_name, color in [("forest", TEAL), ("xgboost", BRASS)]:
+                for model_name in ("forest", "xgboost"):
                     for ts in stats.get(model_name, {}).get("timestamps", []):
                         all_ts.append({"timestamp": ts, "model": model_name})
                 if not all_ts:
@@ -914,26 +1029,56 @@ elif page == "Usage Analytics":
                 else:
                     ts_df = pd.DataFrame(all_ts)
                     ts_df["timestamp"] = pd.to_datetime(ts_df["timestamp"])
-                    ts_df["date"] = ts_df["timestamp"].dt.date
-                    daily = ts_df.groupby(["date", "model"]).size().reset_index(name="calls")
-                    fig = go.Figure()
-                    for model_name, color in [("forest", TEAL), ("xgboost", BRASS)]:
-                        sub = daily[daily["model"] == model_name]
-                        fig.add_trace(
-                            go.Bar(x=sub["date"], y=sub["calls"], name=model_name.title(), marker_color=color)
-                        )
-                    fig.update_layout(
-                        template=PLOTLY_TEMPLATE, height=320, barmode="stack",
-                        yaxis_title="Predictions", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+
+                    span = ts_df["timestamp"].max() - ts_df["timestamp"].min()
+                    if span <= pd.Timedelta(hours=3):
+                        freq, tick_fmt, x_title = "5min", "%H:%M", "Time (5-minute buckets)"
+                    elif span <= pd.Timedelta(days=3):
+                        freq, tick_fmt, x_title = "h", "%b %d, %H:%M", "Time (hourly)"
+                    elif span <= pd.Timedelta(days=90):
+                        freq, tick_fmt, x_title = "D", "%b %d", "Time (daily)"
+                    else:
+                        freq, tick_fmt, x_title = "W", "%b %d", "Time (weekly)"
+
+                    bucketed = (
+                        ts_df.set_index("timestamp")
+                        .resample(freq)
+                        .size()
+                        .rename("calls")
+                        .reset_index()
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Pad a bit of empty space either side so a single point isn't stranded mid-axis
+                    freq_as_timedelta = pd.Timedelta(freq if freq[0].isdigit() else f"1{freq}")
+                    pad = max((bucketed["timestamp"].max() - bucketed["timestamp"].min()) * 0.05, freq_as_timedelta)
+                    x_range = [bucketed["timestamp"].min() - pad, bucketed["timestamp"].max() + pad]
+
+                    fig = go.Figure(
+                        go.Scatter(
+                            x=bucketed["timestamp"], y=bucketed["calls"],
+                            mode="lines+markers",
+                            line=dict(color=TEAL, width=2.5, shape="spline" if len(bucketed) > 2 else "linear"),
+                            marker=dict(size=7, color=BRASS, line=dict(color=INK, width=1)),
+                            fill="tozeroy",
+                            fillcolor="rgba(63,167,150,0.22)",
+                            hovertemplate=f"%{{x|{tick_fmt}}}<br><b>%{{y}} calls</b><extra></extra>",
+                        )
+                    )
+                    fig.update_layout(
+                        template=PLOTLY_TEMPLATE, height=320,
+                        yaxis_title="Predictions", xaxis_title=x_title,
+                        hovermode="x unified",
+                        yaxis=dict(rangemode="tozero"),
+                        xaxis=dict(range=x_range, tickformat=tick_fmt),
+                    )
+                    st.plotly_chart(fig, width="stretch")
+                    st.caption(f"{len(ts_df)} request(s) logged between {ts_df['timestamp'].min():%b %d, %Y %H:%M} and {ts_df['timestamp'].max():%b %d, %Y %H:%M}.")
 
             st.caption(
-                "This log lives in a JSON file on the API's own filesystem — it persists while the service is "
-                "running or asleep, and resets on the next deployment."
+                "Requests are logged to Supabase on every successful prediction, so this chart reflects the full "
+                "history of API traffic — not just what's happened since the last deployment."
             )
 
 
 # --------------------------------------------------------------------------
 st.markdown('<hr class="rule">', unsafe_allow_html=True)
-st.caption("Churn Ledger · a Streamlit front-end for the Churn-Detection FastAPI service · predictions are never computed locally.")
+st.caption("NOVA · a Streamlit front-end for the Churn-Detection FastAPI service · predictions are never computed locally.")
